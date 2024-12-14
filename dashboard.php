@@ -15,6 +15,20 @@ require_once 'db.php';
 // Fetch properties from the database
 $query = $conn->query("SELECT * FROM Properties ORDER BY id DESC");
 $properties = $query->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch inspection times and group them by property_id
+$inspectionQuery = $conn->query("SELECT property_id, inspection_slot FROM InspectionTimes");
+$inspectionSlots = $inspectionQuery->fetchAll(PDO::FETCH_ASSOC);
+
+// Organize inspection slots by property_id
+$inspectionsByProperty = [];
+foreach ($inspectionSlots as $slot) {
+    $propertyId = $slot['property_id'];
+    if (!isset($inspectionsByProperty[$propertyId])) {
+        $inspectionsByProperty[$propertyId] = [];
+    }
+    $inspectionsByProperty[$propertyId][] = $slot['inspection_slot'];
+}
 ?>
 
 <!DOCTYPE html>
@@ -26,7 +40,6 @@ $properties = $query->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="css/style.css"> <!-- Optional for custom styles -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css">
-
 </head>
 <body>
     <div class="container mt-5">
@@ -36,10 +49,16 @@ $properties = $query->fetchAll(PDO::FETCH_ASSOC);
             <a href="logout.php" class="btn btn-danger">Logout</a>
         </div>
 
-        <!-- Add Property Button -->
-        <div class="text-end mb-3">
+        <!-- Buttons Section -->
+        <div class="d-flex justify-content-between mb-3">
+            <!-- Add Property Button -->
             <a href="add_property.php" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> Add Property
+            </a>
+
+            <!-- View Properties Button -->
+            <a href="https://system.tengdragon.com.au/insp/view_properties.php" target="_blank" class="btn btn-secondary">
+                <i class="bi bi-eye"></i> View Properties
             </a>
         </div>
 
@@ -56,7 +75,16 @@ $properties = $query->fetchAll(PDO::FETCH_ASSOC);
                                     <strong>Bathrooms:</strong> <?php echo htmlspecialchars($property['bathrooms']); ?><br>
                                     <strong>Status:</strong> <?php echo htmlspecialchars($property['status']); ?>
                                 </p>
-                                <p class="text-muted small">Inspection: <?php echo htmlspecialchars($property['inspection_time']); ?></p>
+                                <p class="text-muted small">
+                                    <strong>Inspection Slots:</strong><br>
+                                    <?php if (isset($inspectionsByProperty[$property['id']])): ?>
+                                        <?php foreach ($inspectionsByProperty[$property['id']] as $slot): ?>
+                                            <?php echo htmlspecialchars($slot); ?><br>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        No inspection slots available.
+                                    <?php endif; ?>
+                                </p>
                                 <div class="d-flex justify-content-between">
                                     <!-- Edit Icon -->
                                     <a href="edit_property.php?id=<?php echo $property['id']; ?>" class="btn btn-sm btn-success">

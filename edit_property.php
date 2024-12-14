@@ -25,6 +25,11 @@ try {
     if (!$property) {
         die("Property not found.");
     }
+
+    // Fetch inspection times for the property
+    $inspectionQuery = $conn->prepare("SELECT * FROM InspectionTimes WHERE property_id = :property_id");
+    $inspectionQuery->execute([':property_id' => $property_id]);
+    $inspection_slots = $inspectionQuery->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     die("Error fetching property: " . $e->getMessage());
 }
@@ -37,8 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $parking = trim($_POST['parking']);
     $rent_per_week = (float)$_POST['rent_per_week'];
     $status = $_POST['status'];
-    $inspection_time = trim($_POST['inspection_time']);
     $notes = trim($_POST['notes']);
+    
+    // Collect multiple inspection times from the form
+    $inspection_times = $_POST['inspection_slots'] ?? []; // Array of start and end times
 
     try {
         // Update property details in the database
@@ -49,7 +56,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 bathrooms = :bathrooms,
                 parking = :parking,
                 rent_per_week = :rent_per_week,
-                inspection_time = :inspection_time,
                 status = :status,
                 notes = :notes
             WHERE id = :id"
@@ -61,11 +67,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':bathrooms' => $bathrooms,
             ':parking' => $parking,
             ':rent_per_week' => $rent_per_week,
-            ':inspection_time' => $inspection_time,
             ':status' => $status,
             ':notes' => $notes,
             ':id' => $property_id,
         ]);
+
+        // Clear existing inspection times for the property
+        $delete_query = $conn->prepare("DELETE FROM InspectionTimes WHERE property_id = :property_id");
+        $delete_query->execute([':property_id' => $property_id]);
+
+        // Insert updated inspection times into the InspectionTimes table
+        $inspection_insert_query = $conn->prepare(
+            "INSERT INTO InspectionTimes (property_id, inspection_slot) VALUES (:property_id, :inspection_slot)"
+        );
+
+        foreach ($inspection_times as $slot) {
+            if (!empty($slot)) { // Only add non-empty inspection slots
+                $inspection_insert_query->execute([
+                    ':property_id' => $property_id,
+                    ':inspection_slot' => $slot,
+                ]);
+            }
+        }
 
         // Redirect to the dashboard
         header("Location: dashboard.php");
@@ -120,8 +143,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </select>
             </div>
             <div class="mb-3">
-                <label for="inspection_time" class="form-label">Inspection Time</label>
-                <input type="text" class="form-control" id="inspection_time" name="inspection_time" value="<?php echo htmlspecialchars($property['inspection_time']); ?>" placeholder="e.g., 17/12/2024 4:30 pm to 5:00 pm">
+                <label for="inspection_slots" class="form-label">Inspection Slots</label>
+                <div id="inspection-slots-container">
+                    <?php if (!empty($inspection_slots)): ?>
+                        <?php foreach ($inspection_slots as $slot): ?>
+                            <input type="text" class="form-control mb-2" name="inspection_slots[]" value="<?php echo htmlspecialchars($slot['inspection_slot']); ?>" placeholder="Enter inspection time">
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <input type="text" class="form-control mb-2" name="inspection_slots[]" placeholder="Enter inspection time">
+                    <?php endif; ?>
+                </div>
+                <button type="button" id="add-inspection-slot" class="btn btn-sm btn-secondary">Add More</button>
             </div>
             <div class="mb-3">
                 <label for="notes" class="form-label">Notes</label>
@@ -131,5 +163,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <a href="dashboard.php" class="btn btn-secondary">Cancel</a>
         </form>
     </div>
+
+    <script>
+        // Add dynamic fields for multiple inspection slots
+        document.getElementById('add-inspection-slot').addEventListener('click', () => {
+            const container = document.getElementById('inspection-slots-container');
+            const newField = document.createElement('input');
+            newField.type = 'text';
+            newField.name = 'inspection_slots[]';
+            newField.className = 'form-control mb-2';
+            newField.placeholder = 'Enter inspection time';
+            container.appendChild(newField);
+        });
+    </script>
 </body>
 </html>
