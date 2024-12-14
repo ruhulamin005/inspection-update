@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Send an email notification to the user
         $subject = "Inspection Booking Confirmation";
         $message = "Dear $user_name,\n\nYou have successfully booked an inspection for the property '$property_name' at $inspection_slot.\n\nThank you for your booking.";
-        $headers = "From: no-reply@yourwebsite.com";
+        $headers = "From: info@tengdragon.com.au";
 
         mail($user_email, $subject, $message, $headers);
 
